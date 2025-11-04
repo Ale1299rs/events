@@ -1,0 +1,46 @@
+# GitHub Actions - Auto Deploy to Raspberry Pi (Opzionale)
+# Questo workflow può automatizzare il deploy quando fai push su GitHub
+#
+# Setup richiesto:
+# 1. Aggiungi questi secrets nel repository GitHub:
+#    - RPI_HOST: IP del tuo Raspberry Pi
+#    - RPI_USER: username (di solito 'pi')
+#    - RPI_SSH_KEY: chiave privata SSH
+# 2. Configura l'accesso SSH al Raspberry Pi
+
+name: Deploy to Raspberry Pi
+
+on:
+  push:
+    branches:
+      - main
+      - claude/oo-implementation-011CUoaqqXpMsrZQ9JQrxCgu
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Raspberry Pi
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.RPI_HOST }}
+          username: ${{ secrets.RPI_USER }}
+          key: ${{ secrets.RPI_SSH_KEY }}
+          script: |
+            cd ~/events
+            git pull origin claude/oo-implementation-011CUoaqqXpMsrZQ9JQrxCgu
+            npm install --production
+            pm2 restart roma-events-bot
+            pm2 save
+
+      - name: Send Telegram Notification
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            MESSAGE="✅ Bot deployed successfully to Raspberry Pi!"
+          else
+            MESSAGE="❌ Deploy failed! Check GitHub Actions logs."
+          fi
+          echo "Deploy status: $MESSAGE"

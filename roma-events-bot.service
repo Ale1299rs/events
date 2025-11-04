@@ -1,0 +1,38 @@
+# SystemD Service File (Alternativa a PM2)
+# Usa questo solo se preferisci systemd invece di PM2
+#
+# Installazione:
+# sudo cp roma-events-bot.service /etc/systemd/system/
+# sudo systemctl daemon-reload
+# sudo systemctl enable roma-events-bot
+# sudo systemctl start roma-events-bot
+#
+# Comandi:
+# sudo systemctl status roma-events-bot
+# sudo systemctl restart roma-events-bot
+# sudo systemctl stop roma-events-bot
+# sudo journalctl -u roma-events-bot -f
+
+[Unit]
+Description=Roma Events Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/events
+ExecStart=/usr/bin/node /home/pi/events/src/index.js
+Restart=always
+RestartSec=10
+StandardOutput=append:/home/pi/events/logs/out.log
+StandardError=append:/home/pi/events/logs/error.log
+
+# Environment
+Environment=NODE_ENV=production
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
