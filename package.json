@@ -1,0 +1,31 @@
+{
+  "name": "roma-events-telegram-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for Rome events with AI-powered recommendations",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "scrape": "node src/scrapers/runScrapers.js",
+    "setup-db": "node src/database/setup.js"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "events",
+    "rome",
+    "ai"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0",
+    "@supabase/supabase-js": "^2.39.3",
+    "@google/generative-ai": "^0.21.0",
+    "cheerio": "^1.0.0",
+    "axios": "^1.6.5",
+    "dotenv": "^16.4.1",
+    "node-cron": "^3.0.3"
+  }
+}
