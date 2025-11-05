@@ -21,11 +21,14 @@
   "license": "MIT",
   "dependencies": {
     "node-telegram-bot-api": "^0.66.0",
-    "@supabase/supabase-js": "^2.39.3",
+    "@supabase/supabase-js": "2.38.4",
     "@google/generative-ai": "^0.21.0",
-    "cheerio": "^1.0.0",
+    "cheerio": "1.0.0-rc.12",
     "axios": "^1.6.5",
     "dotenv": "^16.4.1",
     "node-cron": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

@@ -1,10 +1,24 @@
 -- Roma Events Bot Database Schema for Supabase
+-- All tables use 'events_' prefix to avoid conflicts with other projects
 
--- Enable UUID extension
+-- STEP 1: Drop all existing tables to avoid type conflicts
+DROP TABLE IF EXISTS events_sent_notifications CASCADE;
+DROP TABLE IF EXISTS events_user_preferences CASCADE;
+DROP TABLE IF EXISTS events_user_subscriptions CASCADE;
+DROP TABLE IF EXISTS events_events CASCADE;
+DROP TABLE IF EXISTS events_categories CASCADE;
+DROP TABLE IF EXISTS events_users CASCADE;
+
+-- Drop function if exists
+DROP FUNCTION IF EXISTS events_update_updated_at_column() CASCADE;
+
+-- STEP 2: Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Users table
-CREATE TABLE IF NOT EXISTS users (
+-- STEP 3: Create tables in correct order
+
+-- Users table (BIGINT id for Telegram user IDs)
+CREATE TABLE events_users (
     id BIGINT PRIMARY KEY,
     username VARCHAR(255),
     first_name VARCHAR(255),
@@ -15,8 +29,8 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Categories table
-CREATE TABLE IF NOT EXISTS categories (
+-- Categories table (UUID id)
+CREATE TABLE events_categories (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(100) UNIQUE NOT NULL,
     name_it VARCHAR(100) NOT NULL,
@@ -25,8 +39,8 @@ CREATE TABLE IF NOT EXISTS categories (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Events table
-CREATE TABLE IF NOT EXISTS events (
+-- Events table (UUID id, references categories)
+CREATE TABLE events_events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(500) NOT NULL,
     description TEXT,
@@ -42,7 +56,7 @@ CREATE TABLE IF NOT EXISTS events (
     image_url VARCHAR(1000),
     source VARCHAR(100),
     source_id VARCHAR(255),
-    category_id UUID REFERENCES categories(id),
+    category_id UUID REFERENCES events_categories(id),
     ai_tags TEXT[],
     is_published BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -50,38 +64,43 @@ CREATE TABLE IF NOT EXISTS events (
     UNIQUE(source, source_id)
 );
 
--- User subscriptions table
-CREATE TABLE IF NOT EXISTS user_subscriptions (
+-- User subscriptions table (references users and categories)
+CREATE TABLE events_user_subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
-    category_id UUID REFERENCES categories(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL,
+    category_id UUID NOT NULL,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(user_id, category_id)
+    UNIQUE(user_id, category_id),
+    CONSTRAINT fk_events_user FOREIGN KEY (user_id) REFERENCES events_users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_events_category FOREIGN KEY (category_id) REFERENCES events_categories(id) ON DELETE CASCADE
 );
 
 -- User preferences table
-CREATE TABLE IF NOT EXISTS user_preferences (
-    user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+CREATE TABLE events_user_preferences (
+    user_id BIGINT PRIMARY KEY,
     notification_time VARCHAR(5) DEFAULT '09:00',
     zones TEXT[],
     max_price DECIMAL(10,2),
     notification_frequency VARCHAR(20) DEFAULT 'immediate',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT fk_events_user_prefs FOREIGN KEY (user_id) REFERENCES events_users(id) ON DELETE CASCADE
 );
 
 -- Sent notifications table (to avoid duplicates)
-CREATE TABLE IF NOT EXISTS sent_notifications (
+CREATE TABLE events_sent_notifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
-    event_id UUID REFERENCES events(id) ON DELETE CASCADE,
+    user_id BIGINT NOT NULL,
+    event_id UUID NOT NULL,
     sent_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(user_id, event_id)
+    UNIQUE(user_id, event_id),
+    CONSTRAINT fk_events_notif_user FOREIGN KEY (user_id) REFERENCES events_users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_events_notif_event FOREIGN KEY (event_id) REFERENCES events_events(id) ON DELETE CASCADE
 );
 
--- Insert default categories
-INSERT INTO categories (name, name_it, emoji, description) VALUES
+-- STEP 4: Insert default categories
+INSERT INTO events_categories (name, name_it, emoji, description) VALUES
     ('music', 'Musica & Concerti', '🎵', 'Concerti, live music, festival musicali'),
     ('art', 'Arte & Mostre', '🎨', 'Mostre d''arte, gallerie, esposizioni'),
     ('sports', 'Sport', '⚽', 'Eventi sportivi, partite, competizioni'),
@@ -94,17 +113,17 @@ INSERT INTO categories (name, name_it, emoji, description) VALUES
     ('markets', 'Mercati & Fiere', '🛍️', 'Mercatini, fiere, mercati vintage')
 ON CONFLICT (name) DO NOTHING;
 
--- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
-CREATE INDEX IF NOT EXISTS idx_events_category ON events(category_id);
-CREATE INDEX IF NOT EXISTS idx_events_published ON events(is_published);
-CREATE INDEX IF NOT EXISTS idx_events_source ON events(source, source_id);
-CREATE INDEX IF NOT EXISTS idx_user_subscriptions_user ON user_subscriptions(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_subscriptions_category ON user_subscriptions(category_id);
-CREATE INDEX IF NOT EXISTS idx_sent_notifications_user_event ON sent_notifications(user_id, event_id);
+-- STEP 5: Create indexes for better performance
+CREATE INDEX idx_events_events_date ON events_events(event_date);
+CREATE INDEX idx_events_events_category ON events_events(category_id);
+CREATE INDEX idx_events_events_published ON events_events(is_published);
+CREATE INDEX idx_events_events_source ON events_events(source, source_id);
+CREATE INDEX idx_events_user_subscriptions_user ON events_user_subscriptions(user_id);
+CREATE INDEX idx_events_user_subscriptions_category ON events_user_subscriptions(category_id);
+CREATE INDEX idx_events_sent_notifications_user_event ON events_sent_notifications(user_id, event_id);
 
--- Create updated_at trigger function
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+-- STEP 6: Create updated_at trigger function
+CREATE OR REPLACE FUNCTION events_update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = NOW();
@@ -113,11 +132,11 @@ END;
 $$ language 'plpgsql';
 
 -- Add triggers for updated_at
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER events_update_users_updated_at BEFORE UPDATE ON events_users
+    FOR EACH ROW EXECUTE FUNCTION events_update_updated_at_column();
 
-CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON events
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER events_update_events_updated_at BEFORE UPDATE ON events_events
+    FOR EACH ROW EXECUTE FUNCTION events_update_updated_at_column();
 
-CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferences
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER events_update_user_preferences_updated_at BEFORE UPDATE ON events_user_preferences
+    FOR EACH ROW EXECUTE FUNCTION events_update_updated_at_column();

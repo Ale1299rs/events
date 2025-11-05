@@ -25,7 +25,7 @@ async function setupDatabase() {
 
     // Test connection
     const { data, error } = await supabaseAdmin
-      .from('categories')
+      .from('events_categories')
       .select('count');
 
     if (error) {
